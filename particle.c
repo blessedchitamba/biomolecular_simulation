@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <omp.h>  //include OMP library
 
 #define DEFAULT_POP_SIZE 300 //bigger population is more costly
 #define DEFAULT_NUM_PARTICLES 30 //more PARTICLES is more costly
@@ -55,6 +56,7 @@ double calcFitness(box_pattern box,int num_particles){
     double fitness=0.0;
     int i,j;
     double x,y,r,tmp;
+    //#pragma omp parallel for
     for (i =0;i<num_particles-1;i++) {
         for (j =i+1;j<num_particles;j++) { //cycle through all pairs to calc distances
             x = (double)box.person[i].x_pos - (double)box.person[j].x_pos;
@@ -122,8 +124,8 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
         for(i=0;i<population_size;i++)
             new_generation[i].person=malloc(num_particles*sizeof(position));
 
+        #pragma omp parallel for
         for (i=0; i<population_size; i+=2){ //two children
-
                 // Determine breeding pair, with tournament of 2 (joust)
                 int one = rand()%(population_size), two=rand()%(population_size);
                 int parentOne=two;
@@ -145,12 +147,14 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
                     int mutated = rand() % num_particles;
                     new_generation[i].person[mutated].x_pos=(rand()%(x_max + 1));
                     new_generation[i].person[mutated].y_pos=(rand()%(y_max + 1));
+                    new_generation[i].fitness=calcFitness(new_generation[i], num_particles);
                 }
                 mutation = rand()/(double)RAND_MAX; //mutation second child
                 if (mutation <= MUTATION_RATE ){
                     int mutated = rand() % num_particles;
                     new_generation[i+1].person[mutated].x_pos=(rand()%(x_max + 1));
                     new_generation[i+1].person[mutated].y_pos=(rand()%(y_max + 1));
+                    new_generation[i].fitness=calcFitness(new_generation[i], num_particles);
                 }
 
         }
@@ -163,21 +167,22 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
         highest=0;
         for (i=1; i<population_size; i++){
             if (box[i].fitness>max_parent.fitness) {
-                copybox(&max_parent,&box[i],num_particles); //replace lowest fitness with highest parent
+                copybox(&max_parent,&box[i],num_particles); //find parent with highest fitness from parent generation
             }
             new_generation[i].fitness=calcFitness(new_generation[i],num_particles);
-            if (new_generation[i].fitness<min_fitness) {
+            if (new_generation[i].fitness<min_fitness) {   //look for min fitness in new generation and also its box
                 min_fitness=new_generation[i].fitness;
                 min_box=i;
             }
-            if (new_generation[i].fitness>max_fitness) {
+            if (new_generation[i].fitness>max_fitness) {   //look for max fitness in new generation
                 max_fitness=new_generation[i].fitness;
                 highest=i;
             }
         }
     
        // printf("max fitness should be: %f\n",max_parent.fitness);
-        //copies
+        //this loop copies everything in new generation into the original box array, while discarding the child with least fitness and
+        //replacing with parent with greatest fitness
         for (i=0; i<population_size; i++){
             //printbox(new_generation[i]);
             if (i==min_box) {
@@ -187,7 +192,7 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
             }
            // printbox(box[i]);
         }
-        if (max_parent.fitness>max_fitness) { //previous generation has the best
+        if (max_parent.fitness>max_fitness) { //previous generation has the best. useful for when this is the last iteration and the parent has the best
             max_fitness=max_parent.fitness;
             highest=min_box;
             //printf("max fitness should be: %f",max_parent.fitness);
@@ -241,10 +246,25 @@ int main(int argc, char *argv[] ){
                 // main loop
                 int stop=0;
                 int gen=0,highest=0;
-                while (gen<MAX_GEN){
+                int prev_highest = 0;
+                int highest_count = 0;
+                do{
+                    prev_highest = highest;  //highest is an index remember
                     highest=breeding(population,population_size,x_max,y_max,num_particles);
                     gen+=1;
-                }
+                    if(prev_highest==highest){
+                        //if the previous highest and the highest are the same then increment the count, else zero it
+                        highest_count++;
+                    }else{
+                        highest_count = 0;
+                    }
+                    //printf("%d\n", highest);
+                }while(highest_count<10);
+                // while (gen<MAX_GEN){
+                //     highest=breeding(population,population_size,x_max,y_max,num_particles);
+                //     gen+=1;
+                //     //printf("%d\n", highest);
+                // }
             printf("# generations= %d \n", gen);
             printf("Best solution:\n");
             printbox(population[highest],num_particles);
