@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 #include <omp.h>  //include OMP library
 
 #define DEFAULT_POP_SIZE 300 //bigger population is more costly
@@ -120,45 +121,55 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
         max_parent.person=malloc(num_particles*sizeof(position));
         copybox(&max_parent,&box[0],num_particles); //set max to first one
         int i;
+        unsigned int seed;
         box_pattern * new_generation = (box_pattern*) malloc(sizeof(box_pattern)*(population_size));
         for(i=0;i<population_size;i++)
             new_generation[i].person=malloc(num_particles*sizeof(position));
 
-        #pragma omp parallel for
-        for (i=0; i<population_size; i+=2){ //two children
-                // Determine breeding pair, with tournament of 2 (joust)
-                int one = rand()%(population_size), two=rand()%(population_size);
-                int parentOne=two;
-                if (box[one].fitness > box[two].fitness) parentOne=one; //joust
-            
-                one = rand()%(population_size);
-                two=rand()%(population_size);
-                int parentTwo=two;
-                if (box[one].fitness > box[two].fitness) parentTwo=one; //joust
-            
-                int splitPoint = rand() % num_particles; //split chromosome at point
-                new_generation[i]= crossover(new_generation[i], box[parentOne], box[parentTwo], splitPoint,num_particles); //first child
+        #pragma omp parallel private(i) shared(new_generation)
+        { 
+            //srand((((int)omp_get_wtime())^omp_get_thread_num())); // randomize seed
 
-                new_generation[i+1] = crossover(new_generation[i+1], box[parentTwo], box[parentOne], splitPoint,num_particles); //second child
-            
-                // Mutation first child
-                double mutation = rand()/(double)RAND_MAX;
-                if (mutation <= MUTATION_RATE ){
-                    int mutated = rand() % num_particles;
-                    new_generation[i].person[mutated].x_pos=(rand()%(x_max + 1));
-                    new_generation[i].person[mutated].y_pos=(rand()%(y_max + 1));
-                    new_generation[i].fitness=calcFitness(new_generation[i], num_particles);
-                }
-                mutation = rand()/(double)RAND_MAX; //mutation second child
-                if (mutation <= MUTATION_RATE ){
-                    int mutated = rand() % num_particles;
-                    new_generation[i+1].person[mutated].x_pos=(rand()%(x_max + 1));
-                    new_generation[i+1].person[mutated].y_pos=(rand()%(y_max + 1));
-                    new_generation[i].fitness=calcFitness(new_generation[i], num_particles);
-                }
+            #pragma omp for
+            for (i=0; i<population_size; i+=2){ //two children
+                    // Determine breeding pair, with tournament of 2 (joust)
+                    int one = rand()%(population_size); 
+                    int two=rand()%(population_size);
+                    int parentOne=two;
+                    //printf("One and two: %d,%d\n",one, two);
+                    if (box[one].fitness > box[two].fitness) parentOne=one; //joust
+                
+                    one = rand()%(population_size);
+                    two=rand()%(population_size);
+                    //printf("Three and four: %d,%d\n",one, two);
+                    int parentTwo=two;
+                    if (box[one].fitness > box[two].fitness) parentTwo=one; //joust
+                    
+                
+                    int splitPoint = rand() % num_particles; //split chromosome at point
+                    new_generation[i]= crossover(new_generation[i], box[parentOne], box[parentTwo], splitPoint,num_particles); //first child
 
+                    new_generation[i+1] = crossover(new_generation[i+1], box[parentTwo], box[parentOne], splitPoint,num_particles); //second child
+                
+                    // Mutation first child
+                    double mutation = rand()/(double)RAND_MAX;
+                    if (mutation <= MUTATION_RATE ){
+                        int mutated = rand() % num_particles;
+                        new_generation[i].person[mutated].x_pos=(rand()%(x_max + 1));
+                        new_generation[i].person[mutated].y_pos=(rand()%(y_max + 1));
+                        new_generation[i].fitness=calcFitness(new_generation[i], num_particles);
+                    }
+                    mutation = rand()/(double)RAND_MAX; //mutation second child
+                    if (mutation <= MUTATION_RATE ){
+                        int mutated = rand() % num_particles;
+                        new_generation[i+1].person[mutated].x_pos=(rand()%(x_max + 1));
+                        new_generation[i+1].person[mutated].y_pos=(rand()%(y_max + 1));
+                        new_generation[i].fitness=calcFitness(new_generation[i], num_particles);
+                    }
+
+            }
         }
-  
+        //printf("new_generation length: %d\n",new_generation.length);
         //find maximum parent fitness to keep and minimum new generation to throw away
         new_generation[0].fitness=calcFitness(new_generation[0],num_particles);
         double min_fitness=new_generation[0].fitness;
@@ -206,6 +217,7 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
 
 
 
+
 int main(int argc, char *argv[] ){
         int population_size=DEFAULT_POP_SIZE;
         int x_max =X_DEFAULT;
@@ -243,11 +255,13 @@ int main(int argc, char *argv[] ){
                 printf("=========%d\n", k);
 
                 double max_fitness=0;
+                double time_spent = 0.0;
                 // main loop
                 int stop=0;
                 int gen=0,highest=0;
                 int prev_highest = 0;
                 int highest_count = 0;
+                clock_t begin = clock();
                 do{
                     prev_highest = highest;  //highest is an index remember
                     highest=breeding(population,population_size,x_max,y_max,num_particles);
@@ -260,6 +274,9 @@ int main(int argc, char *argv[] ){
                     }
                     //printf("%d\n", highest);
                 }while(highest_count<10);
+                clock_t end = clock();
+                time_spent += (double)(end-begin)/CLOCKS_PER_SEC;
+                printf("Time spent in this iteration is %f seconds\n", time_spent);
                 // while (gen<MAX_GEN){
                 //     highest=breeding(population,population_size,x_max,y_max,num_particles);
                 //     gen+=1;
