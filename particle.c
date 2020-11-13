@@ -57,7 +57,6 @@ double calcFitness(box_pattern box,int num_particles){
     double fitness=0.0;
     int i,j;
     double x,y,r,tmp;
-	//#pragma omp critical
     for (i =0;i<num_particles-1;i++) {
         for (j =i+1;j<num_particles;j++) { //cycle through all pairs to calc distances
             x = (double)box.person[i].x_pos - (double)box.person[j].x_pos;
@@ -75,6 +74,7 @@ double calcFitness(box_pattern box,int num_particles){
 /* Creates initial random population */
 void initPopulation(box_pattern * box, int population_size,int xmax,int ymax,int num_particles){
     int i,p;
+	#pragma omp parallel for if (population_size>100)
     for (p=0;p<population_size;p++) {
         for (i=0; i<num_particles; i++){
             box[p].person[i].x_pos=(rand()%(xmax + 1));
@@ -128,6 +128,7 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
 
         #pragma omp parallel private(i) shared(new_generation)
         { 
+			//int t = (int)omp_get_wtime();
             //srand((((int)omp_get_wtime())^omp_get_thread_num())); // randomize seed
 
             #pragma omp for
@@ -154,7 +155,6 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
                 
                     // Mutation first child
                     double mutation = rand()/(double)RAND_MAX;
-					//#pragma omp critical
                     if (mutation <= MUTATION_RATE ){
                         int mutated = rand() % num_particles;
                         new_generation[i].person[mutated].x_pos=(rand()%(x_max + 1));
@@ -162,7 +162,6 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
                         new_generation[i].fitness=calcFitness(new_generation[i], num_particles);
                     }
                     mutation = rand()/(double)RAND_MAX; //mutation second child
-					//#pragma omp critical
                     if (mutation <= MUTATION_RATE ){
                         int mutated = rand() % num_particles;
                         new_generation[i+1].person[mutated].x_pos=(rand()%(x_max + 1));
@@ -211,7 +210,6 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
             }
            // printbox(box[i]);
         }
-		#pragma omp critical
         if (max_parent.fitness>max_fitness) { //previous generation has the best. useful for when this is the last iteration and the parent has the best
             max_fitness=max_parent.fitness;
             highest=min_box;
