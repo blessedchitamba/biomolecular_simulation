@@ -10,7 +10,7 @@
 #include <time.h>
 #include <omp.h>  //include OMP library
 
-#define DEFAULT_POP_SIZE 300 //bigger population is more costly
+#define DEFAULT_POP_SIZE 100 //bigger population is more costly
 #define DEFAULT_NUM_PARTICLES 30 //more PARTICLES is more costly
 
 // consts
@@ -57,7 +57,7 @@ double calcFitness(box_pattern box,int num_particles){
     double fitness=0.0;
     int i,j;
     double x,y,r,tmp;
-    //#pragma omp parallel for
+	//#pragma omp critical
     for (i =0;i<num_particles-1;i++) {
         for (j =i+1;j<num_particles;j++) { //cycle through all pairs to calc distances
             x = (double)box.person[i].x_pos - (double)box.person[j].x_pos;
@@ -145,14 +145,16 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
                     int parentTwo=two;
                     if (box[one].fitness > box[two].fitness) parentTwo=one; //joust
                     
-                
+					
                     int splitPoint = rand() % num_particles; //split chromosome at point
-                    new_generation[i]= crossover(new_generation[i], box[parentOne], box[parentTwo], splitPoint,num_particles); //first child
+                    
+					new_generation[i]= crossover(new_generation[i], box[parentOne], box[parentTwo], splitPoint,num_particles); //first child
 
                     new_generation[i+1] = crossover(new_generation[i+1], box[parentTwo], box[parentOne], splitPoint,num_particles); //second child
                 
                     // Mutation first child
                     double mutation = rand()/(double)RAND_MAX;
+					//#pragma omp critical
                     if (mutation <= MUTATION_RATE ){
                         int mutated = rand() % num_particles;
                         new_generation[i].person[mutated].x_pos=(rand()%(x_max + 1));
@@ -160,6 +162,7 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
                         new_generation[i].fitness=calcFitness(new_generation[i], num_particles);
                     }
                     mutation = rand()/(double)RAND_MAX; //mutation second child
+					//#pragma omp critical
                     if (mutation <= MUTATION_RATE ){
                         int mutated = rand() % num_particles;
                         new_generation[i+1].person[mutated].x_pos=(rand()%(x_max + 1));
@@ -176,6 +179,7 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
         int min_box=0;
         double max_fitness= new_generation[0].fitness;
         highest=0;
+		#pragma omp for
         for (i=1; i<population_size; i++){
             if (box[i].fitness>max_parent.fitness) {
                 copybox(&max_parent,&box[i],num_particles); //find parent with highest fitness from parent generation
@@ -194,6 +198,7 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
        // printf("max fitness should be: %f\n",max_parent.fitness);
         //this loop copies everything in new generation into the original box array, while discarding the child with least fitness and
         //replacing with parent with greatest fitness
+		#pragma omp for
         for (i=0; i<population_size; i++){
             //printbox(new_generation[i]);
             if (i==min_box) {
