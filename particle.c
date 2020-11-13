@@ -181,15 +181,18 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
         highest=0;
 		#pragma omp for
         for (i=1; i<population_size; i++){
+			#pragma omp critical
             if (box[i].fitness>max_parent.fitness) {
                 copybox(&max_parent,&box[i],num_particles); //find parent with highest fitness from parent generation
             }
             new_generation[i].fitness=calcFitness(new_generation[i],num_particles);
-            if (new_generation[i].fitness<min_fitness) {   //look for min fitness in new generation and also its box
+            #pragma omp critical
+			if (new_generation[i].fitness<min_fitness) {   //look for min fitness in new generation and also its box
                 min_fitness=new_generation[i].fitness;
                 min_box=i;
             }
-            if (new_generation[i].fitness>max_fitness) {   //look for max fitness in new generation
+            #pragma omp critical
+			if (new_generation[i].fitness>max_fitness) {   //look for max fitness in new generation
                 max_fitness=new_generation[i].fitness;
                 highest=i;
             }
@@ -208,6 +211,7 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
             }
            // printbox(box[i]);
         }
+		#pragma omp critical
         if (max_parent.fitness>max_fitness) { //previous generation has the best. useful for when this is the last iteration and the parent has the best
             max_fitness=max_parent.fitness;
             highest=min_box;
