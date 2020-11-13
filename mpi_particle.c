@@ -223,6 +223,8 @@ int main(int argc, char *argv[] ){
         int k,i;
         int rank, numprocs;
         int gen_count=0;
+        double *totals = NULL;
+        double time_spent = 0.0;
         FILE *f;
 
         if (argc >=2) {
@@ -240,9 +242,10 @@ int main(int argc, char *argv[] ){
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);        
         
         if(rank==0){
-            f = fopen("solution.txt", "w");
-            printf("Writing dimensions to file\n");
-            fprintf(f,"%d,%d\n",x_max,y_max); //write box dimensions as first line of file
+            f = fopen("solution.txt", "a");
+            totals = (double *)malloc(sizeof(double) * iter);  //initialize array for storing the highest of each iteration
+            //printf("Writing dimensions to file\n");
+            //fprintf(f,"%d,%d\n",x_max,y_max); //write box dimensions as first line of file
             printf("Starting optimization with particles = %d, population=%d, width=%d,length=%d for %d iterations\n",num_particles,population_size,x_max,y_max,iter);
         }
         box_pattern * population;
@@ -259,13 +262,13 @@ int main(int argc, char *argv[] ){
                 //printf("Rank: %d\n", rank);
 
                 double max_fitness=0;
-                double time_spent = 0.0;
                 // main loop
                 int stop=0;
                 int gen=0,highest=0;
                 int prev_highest = 0;
                 int highest_count = 0;
                 clock_t begin = clock();
+                // begin = omp_get_wtime();
                 do{
                     prev_highest = highest;  //highest is an index remember
                     highest=breeding(population,population_size,x_max,y_max,num_particles);
@@ -293,17 +296,20 @@ int main(int argc, char *argv[] ){
                 if(rank==0){
                     //print the elements of the received buffer
                     clock_t end = clock();
+                    //double end = omp_get_wtime();
                     time_spent += (double)(end-begin)/CLOCKS_PER_SEC;
-                    printf("Time spent in this iteration is %f seconds\n", time_spent);
+                    printf("Time spent in this iteration is %f seconds\n", (double)(end-begin)/CLOCKS_PER_SEC);
                     int i;
                     double max = fitness;
-                    for(i=0; i<4; i++){
+                    for(i=0; i<numprocs; i++){
                         if(highest_buffer[i]>max){
                             max = highest_buffer[i];
                         }
                     }
                     printf("The highest energy in this iteration is %f\n", max);
+                    totals[iter] = max;  //add the highest energy for this iteration to the totals array
                     printf("# generations= %d \n", gen);
+                    //fprintf(f,"Energy: %f, Time: %f\n",max,time_spent); 
                     gen_count+=gen;
                     printf("---------");
                 }
@@ -312,29 +318,34 @@ int main(int argc, char *argv[] ){
                 //     gen+=1;
                 //     //printf("%d\n", highest);
                 // }
-            //printf("Best solution:\n");
-            // printbox(population[highest],num_particles);
-            // if (f == NULL)
-            // {
-            //     printf("Error oping file!\n");
-            //     exit(1);
-            // }
-            // printboxFile(population[highest],f,num_particles);
-            
-            //gen_count+=gen;
-            MPI_Barrier(MPI_COMM_WORLD);
+                MPI_Barrier(MPI_COMM_WORLD);
         }
+
         if(rank==0){
+            double max_total = totals[0];
+            //printf("max_total %f \n", max_total);
+            int i;
+            for(i=0; i<iter; i++){
+                if(totals[i]>max_total){
+                    max_total = totals[i];
+                }
+            }
+            fprintf(f,"%d, %f\n",population_size,time_spent/numprocs);
             fclose(f);
         }
+        
         
     
         for(i=0;i<population_size;i++)
                 free(population[i].person); //release memory
         free(population); //release memory
 
-        MPI_Finalize();
+        // if(rank==0){
+        //      MPI_Finalize();
+        // }
         //printf("Average generations: %f\n", (double)gen_count/(double)k);
+        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Finalize();
         return 0;
 }
 
