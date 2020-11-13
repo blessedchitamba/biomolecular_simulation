@@ -49,7 +49,7 @@ void printboxFile(box_pattern box,FILE *f,int num_particles ){
     for (i=0; i<num_particles-1; i++){
         fprintf(f,"%d,%d\t",box.person[i].x_pos,box.person[i].y_pos);
     }
-    fprintf(f,"%d,%d\t:fitness %f\n",box.person[i].x_pos,box.person[i].y_pos,box.fitness);
+    fprintf(f,"%d,%d\n",box.person[i].x_pos,box.person[i].y_pos,box.fitness);
 }
 
 /* FITNESS FUNCTION  - this is key*/
