@@ -49,7 +49,7 @@ void printboxFile(box_pattern box,FILE *f,int num_particles ){
     for (i=0; i<num_particles-1; i++){
         fprintf(f,"%d,%d\t",box.person[i].x_pos,box.person[i].y_pos);
     }
-    fprintf(f,"%d,%d\n",box.person[i].x_pos,box.person[i].y_pos,box.fitness);
+    fprintf(f,"%d,%d\t:fitness %f\n",box.person[i].x_pos,box.person[i].y_pos,box.fitness);
 }
 
 /* FITNESS FUNCTION  - this is key*/
@@ -74,7 +74,7 @@ double calcFitness(box_pattern box,int num_particles){
 /* Creates initial random population */
 void initPopulation(box_pattern * box, int population_size,int xmax,int ymax,int num_particles){
     int i,p;
-	#pragma omp parallel for if (population_size>100)
+    #pragma omp parallel for if (population_size>100)
     for (p=0;p<population_size;p++) {
         for (i=0; i<num_particles; i++){
             box[p].person[i].x_pos=(rand()%(xmax + 1));
@@ -128,7 +128,7 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
 
         #pragma omp parallel private(i) shared(new_generation)
         { 
-			//int t = (int)omp_get_wtime();
+            //int t = (int)omp_get_wtime();
             //srand((((int)omp_get_wtime())^omp_get_thread_num())); // randomize seed
 
             #pragma omp for
@@ -146,10 +146,10 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
                     int parentTwo=two;
                     if (box[one].fitness > box[two].fitness) parentTwo=one; //joust
                     
-					
+                    
                     int splitPoint = rand() % num_particles; //split chromosome at point
                     
-					new_generation[i]= crossover(new_generation[i], box[parentOne], box[parentTwo], splitPoint,num_particles); //first child
+                    new_generation[i]= crossover(new_generation[i], box[parentOne], box[parentTwo], splitPoint,num_particles); //first child
 
                     new_generation[i+1] = crossover(new_generation[i+1], box[parentTwo], box[parentOne], splitPoint,num_particles); //second child
                 
@@ -178,20 +178,20 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
         int min_box=0;
         double max_fitness= new_generation[0].fitness;
         highest=0;
-		#pragma omp for
+        #pragma omp for
         for (i=1; i<population_size; i++){
-			#pragma omp critical
+            #pragma omp critical
             if (box[i].fitness>max_parent.fitness) {
                 copybox(&max_parent,&box[i],num_particles); //find parent with highest fitness from parent generation
             }
             new_generation[i].fitness=calcFitness(new_generation[i],num_particles);
             #pragma omp critical
-			if (new_generation[i].fitness<min_fitness) {   //look for min fitness in new generation and also its box
+            if (new_generation[i].fitness<min_fitness) {   //look for min fitness in new generation and also its box
                 min_fitness=new_generation[i].fitness;
                 min_box=i;
             }
             #pragma omp critical
-			if (new_generation[i].fitness>max_fitness) {   //look for max fitness in new generation
+            if (new_generation[i].fitness>max_fitness) {   //look for max fitness in new generation
                 max_fitness=new_generation[i].fitness;
                 highest=i;
             }
@@ -200,7 +200,7 @@ int breeding(box_pattern * box, int population_size, int x_max, int y_max,int nu
        // printf("max fitness should be: %f\n",max_parent.fitness);
         //this loop copies everything in new generation into the original box array, while discarding the child with least fitness and
         //replacing with parent with greatest fitness
-		#pragma omp for
+        #pragma omp for
         for (i=0; i<population_size; i++){
             //printbox(new_generation[i]);
             if (i==min_box) {
